@@ -43,46 +43,82 @@ export default function Home() {
 
   // When a country is selected, auto-populate the cities dropdown
   const handleCountryChange = (selected) => {
+    console.log('Selected Country:', selected.value);
     setCountry(selected.value);
     setCities(cityOptions[selected.value] || []);
     setCity(''); 
   };
 
-  // Function to fetch weather data from OpenWeatherMap API
+  // Function to fetch weather and air quality data
   const fetchWeatherData = async () => {
     if (!city || !country) {
+      console.log('City or country is missing.');
       setMessage('Please select both a city and country.');
       return;
     }
 
-    const API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
+    const API_KEY = process.env.NEXT_PUBLIC_AIR_QUALITY_API_KEY;
+    const AIR_QUALITY_API_KEY = process.env.NEXT_PUBLIC_AIR_QUALITY_API_KEY;
+    
+    console.log('Fetching data for City:', city, 'Country:', country);
+    console.log('Weather API Key:', API_KEY);
+    console.log('Air Quality API Key:', AIR_QUALITY_API_KEY);
 
     try {
-      const response = await axios.get(
+      console.log('Fetching weather data...');
+      // Fetch weather data (temperature, humidity)
+      const weatherResponse = await axios.get(
         `https://api.openweathermap.org/data/2.5/weather?q=${city},${country}&units=metric&appid=${API_KEY}`
       );
-      const weatherData = response.data;
+      const weatherData = weatherResponse.data;
+      console.log('Weather data fetched:', weatherData);
 
       const temperature = weatherData.main.temp;
       const humidity = weatherData.main.humidity;
+      const lat = weatherData.coord.lat;
+      const lon = weatherData.coord.lon;
 
-      // Log the data before sending to the backend
-      console.log('Sending data to API:', { city, country, temperature, humidity });
+      console.log('Temperature:', temperature, 'Humidity:', humidity);
+      console.log('Latitude:', lat, 'Longitude:', lon);
 
+      console.log('Fetching air quality data...');
+      // Fetch air quality data based on coordinates
+      const airQualityResponse = await axios.get(
+        `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${AIR_QUALITY_API_KEY}`
+      );
+      const airQualityData = airQualityResponse.data;
+      console.log('Air quality data fetched:', airQualityData);
+
+      const pm25 = airQualityData.list[0].components.pm2_5;
+      const co2 = airQualityData.list[0].components.co;
+
+      console.log('PM2.5:', pm25, 'CO2:', co2);
+
+      console.log('Storing fetched data...');
       // Store the fetched data in the custom API endpoint
       await axios.post('/api/data', {
         city,
         country,
         temperature,
         humidity,
+        pm25,
+        co2,
+        timestamp: new Date().toISOString(),
       });
+      console.log('Data stored successfully.');
 
+      console.log('Fetching stored data for chart...');
       // Fetch stored data for displaying on the chart
       const storedData = await axios.get('/api/data');
+      console.log('Stored data:', storedData.data.data);
+
       const cityLabels = storedData.data.data.map((entry) => entry.city);
       const temperatureData = storedData.data.data.map((entry) => entry.temperature);
       const humidityData = storedData.data.data.map((entry) => entry.humidity);
+      const pm25Data = storedData.data.data.map((entry) => entry.pm25);
+      const co2Data = storedData.data.data.map((entry) => entry.co2);
 
+      console.log('Updating chart data...');
       // Update chart data
       setChartData({
         labels: cityLabels,
@@ -99,13 +135,26 @@ export default function Home() {
             borderColor: 'rgba(54,162,235,1)',
             fill: false,
           },
+          {
+            label: 'PM2.5 (μg/m³)',
+            data: pm25Data,
+            borderColor: 'rgba(75,192,192,1)',
+            fill: false,
+          },
+          {
+            label: 'CO2 (ppm)',
+            data: co2Data,
+            borderColor: 'rgba(153,102,255,1)',
+            fill: false,
+          },
         ],
       });
+      console.log('Chart data updated successfully.');
 
-      setMessage(`Weather data for ${city}, ${country} fetched and stored successfully.`);
+      setMessage(`Weather and air quality data for ${city}, ${country} fetched and stored successfully.`);
     } catch (error) {
-      console.error('Error fetching weather data:', error);
-      setMessage('Error fetching weather data. Please check the city and country names.');
+      console.error('Error fetching data:', error.response ? error.response.data : error.message);
+      setMessage('Error fetching data. Please check the city and country names.');
     }
   };
 
@@ -162,4 +211,3 @@ export default function Home() {
     </div>
   );
 }
-
