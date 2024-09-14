@@ -1,0 +1,3 @@
+[submodule "euclid-development-environment/sdk-developer-dashboard"]
+	path = euclid-development-environment/sdk-developer-dashboard
+	url = https://github.com/sureshora/hackathon1metagraph.git
